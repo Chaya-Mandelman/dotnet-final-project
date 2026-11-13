@@ -1,0 +1,46 @@
+# Render Blueprint: יוצר בלחיצה אחת את בסיס הנתונים, את השרת ואת הלקוח.
+# ב-Render: New → Blueprint → בוחרים את ה-repository dotnet-final-project.
+databases:
+  - name: swimreg-db
+    databaseName: swimreg
+    user: swimreg
+    plan: free
+    region: frankfurt
+
+services:
+  # השרת (ASP.NET Core) - נמצא בתיקייה swimreg-server
+  - type: web
+    name: swimreg-api
+    runtime: docker
+    plan: free
+    region: frankfurt
+    rootDir: swimreg-server
+    dockerfilePath: ./src/SwimReg.API/Dockerfile
+    dockerContext: .
+    healthCheckPath: /swagger/index.html
+    envVars:
+      - key: ConnectionStrings__DefaultConnection
+        fromDatabase:
+          name: swimreg-db
+          property: connectionString
+      - key: Jwt__Key
+        generateValue: true
+      - key: Cors__AllowedOrigins__0
+        sync: false
+
+  # הלקוח (React) - נמצא בתיקייה swimreg-client
+  - type: web
+    name: swimreg-client
+    runtime: static
+    rootDir: swimreg-client
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      # כתובת השרת ב-Render, למשל https://swimreg-api-xxxx.onrender.com (נקראת בזמן ה-build)
+      - key: VITE_API_URL
+        sync: false
+    routes:
+      # BrowserRouter: כל נתיב מוגש מ-index.html, כדי שרענון של /courses לא יחזיר 404
+      - type: rewrite
+        source: /*
+        destination: /index.html
